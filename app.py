@@ -44,25 +44,10 @@ def send_file(path):
 from endpoints.ping.resource import PingResource
 from endpoints.auth.resource import AuthResource
 from endpoints.users.resource import UserResource
-from endpoints.address.resource import AddressResource
-from endpoints.products.resource import ProductResource
-from endpoints.jastip.resource import JastipResource, JastipListClientResource, JastipCurrentSessionResource, JastipOrderDetailsResource, JastipHistoryResources
-from endpoints.anjem.resource import AnjemResource, AnjemOrderResource
-from endpoints.order.resource import OrderResource
 
 api.add_resource(PingResource, '/', '/ping')
 api.add_resource(AuthResource, '/auth', '/auth/<string:id>')
 api.add_resource(UserResource, '/user')
-api.add_resource(AddressResource, '/address')
-api.add_resource(ProductResource, '/product', '/product/<string:product_id>')
-api.add_resource(JastipResource, '/jastip', '/jastip/<string:jsession_id>')
-api.add_resource(JastipListClientResource, '/jastip/clients')
-api.add_resource(JastipCurrentSessionResource, '/jastip/session', '/jastip/session/<string:session_id>')
-api.add_resource(JastipOrderDetailsResource, '/jastip/details/<string:jheader_id>')
-api.add_resource(JastipHistoryResources, '/jastip/history', '/jastip/history/<string:session_id>')
-api.add_resource(AnjemResource, '/anjem', '/anjem/<string:id>')
-api.add_resource(AnjemOrderResource, '/anjem/history', '/anjem/history/<string:id>')
-api.add_resource(OrderResource, '/history')
 
 if __name__ == '__main__':
     app.run()

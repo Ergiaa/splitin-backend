@@ -1,7 +1,7 @@
 services:
   app:
-    container_name: anjemin-backend
-    hostname: anjemin-backend
+    container_name: splitin-backend
+    hostname: splitin-backend
     build:
       context: .
       dockerfile: Dockerfile
@@ -21,8 +21,8 @@ services:
       - ./static:/var/www/app/static
   
   app_dev:
-    container_name: anjemin-backend-dev
-    hostname: anjemin-backend-dev
+    container_name: splitin-backend-dev
+    hostname: splitin-backend-dev
     build:
       context: .
       dockerfile: Dockerfile
@@ -38,8 +38,8 @@ services:
       - ./static:/var/www/app/static
 
   # postgres:
-  #   container_name: anjemin-db
-  #   hostname: anjemin-db
+  #   container_name: splitin-db
+  #   hostname: splitin-db
   #   image: postgres:latest
   #   ports:
   #     - 5432:5432

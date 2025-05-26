@@ -1,5 +1,4 @@
-# Anjemin Backend
-[Developer](https://github.com/HyggeHalcyon)
+# SplitIn Backend
 
 ## Setup environment variables  
 `cp settings.py.example settings.py`
