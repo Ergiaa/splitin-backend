@@ -1,0 +1,49 @@
+services:
+  app:
+    container_name: anjemin-backend
+    hostname: anjemin-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - TZ=Asia/Jakarta
+    ports:
+      - 8800:8000
+    # depends_on:
+    #   - postgres
+    restart: unless-stopped
+    # links: 
+    #   - postgres
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./migrations:/var/www/app/migrations
+      - ./static:/var/www/app/static
+  
+  app_dev:
+    container_name: anjemin-backend-dev
+    hostname: anjemin-backend-dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - TZ=Asia/Jakarta
+    ports:
+      - 8802:8000
+    restart: unless-stopped
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./migrations:/var/www/app/migrations
+      - ./static:/var/www/app/static
+
+  # postgres:
+  #   container_name: anjemin-db
+  #   hostname: anjemin-db
+  #   image: postgres:latest
+  #   ports:
+  #     - 5432:5432
+  #   environment:
+  #     - POSTGRES_USER=cawk
+  #     - POSTGRES_PASSWORD=cawk
+  #     - POSTGRES_DB=cawk
