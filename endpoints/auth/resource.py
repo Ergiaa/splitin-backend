@@ -1,9 +1,9 @@
 from flask_restful import Resource, request
 from flask import g as ctx
-# from app import db
+from firebase.config import db
 
 from .validate import login_parser
-from endpoints.users.model import User, Client, Customer, UserType    
+from endpoints.users.model import User
 from utils.response import response, abort
 from utils.password import verify_password
 from utils.jwt import create_auth_token
@@ -12,49 +12,70 @@ from middleware.auth import authenticate
 class AuthResource(Resource):
     def post(self):
         try:
-            args = login_parser.parse_args(strict=True) 
+            args = login_parser.parse_args(strict=True)
         except Exception as e:
             return abort("validation failure", 400, e)
 
-        user = User.query.filter_by(email=args['email'], user_type=args['type']).first()
-        if not user:
+        email = args['email']
+
+        # Fetch user by email
+        query = db.collection("users")\
+                  .where("email", "==", email)\
+                  .limit(1)
+        results = query.get()
+
+        if not results:
             return abort("login failed", 401)
-        if user.user_type == UserType.CLIENT:
-            client = Client.query.filter_by(user_id=user.id).first()
-            if client.verification_status == False:
-                return abort("user not verified", 404)
-        
-        if not verify_password(args['password'], user.password):
+
+        doc = results[0]
+        user = doc.to_dict()
+        user_id = doc.id  # Firebase document ID
+
+        # Verify password (use dictionary key)
+        if not verify_password(args['password'], user.get('password')):
             return abort("login failed", 401)
-        
-        token = create_auth_token(str(user.id), str(user.user_type.value))
+
+        token = create_auth_token(user_id)
+
         return response("login success", 200, data={
             "token": token,
+            "user": {
+                "id": user_id,
+                "email": user.get('email'),
+                "username": user.get('username')
+            }
         })
     
     @authenticate
     def get(self):
-        user = User.query.get(ctx.user_id)
-        if not user:
+        user_ref = db.collection("users").document(ctx.user_id)
+        doc = user_ref.get()
+
+        if not doc.exists:
             return abort("user not found", 404)
-        
-        if ctx.role == UserType.CUSTOMER.value:
-            resp = user.json(deep=UserType.CUSTOMER)
-        else:
-            resp = user.json(deep=UserType.CLIENT)
-            
-        return response("auth success", 200, data=resp)
-    
+
+        user = doc.to_dict()
+        user['id'] = doc.id  # Include document ID
+
+        return response("auth success", 200, data=user)
+
     def patch(self, id=None):
-        if id is None:
+        if not id:
             return abort("user id required", 400)
-        user = Client.query.filter_by(user_id = id).first()
-        if not user:
+
+        user_ref = db.collection("users").document(id)
+        doc = user_ref.get()
+
+        if not doc.exists:
             return abort("user not found", 404)
-        if user.verification_status == True:
+
+        user = doc.to_dict()
+
+        # Check verification_status
+        if user.get('verification_status') is True:
             return abort("user already verified", 400)
-        
-        Client.query.filter_by(user_id=id).update({'verification_status':True})
-        db.session.commit()
+
+        # Update verification_status
+        user_ref.update({'verification_status': True})
 
         return response("verification success", 200)

@@ -1,117 +1,82 @@
-# from app import db
-from enum import Enum
-from uuid import uuid4
-from typing import Optional
-from sqlalchemy import ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from firebase.config import db
 
-# from endpoints.anjem.model import AnjemDriverStatus
+class User:
+    def __init__(self, uid=None):
+        """
+        If uid is provided, points to that user document.
+        If uid is None, instance won't be tied to a specific document (use create_user instead).
+        """
+        self.uid = uid
+        self.ref = db.collection("users").document(uid) if uid else None
 
-class UserType(Enum):
-    CLIENT = "client"
-    CUSTOMER = "customer"
+    def create(self, data):
+        """
+        Create or overwrite the user document at self.uid.
+        """
+        if not self.ref:
+            raise ValueError("User uid is not set. Use create_user() for new users.")
+        self.ref.set(data)
 
-class Gender(Enum):
-    MALE = "male"
-    FEMALE = "female"
+    def get(self):
+        """
+        Get the user data dictionary for self.uid.
+        """
+        if not self.ref:
+            raise ValueError("User uid is not set.")
+        doc = self.ref.get()
+        return doc.to_dict() if doc.exists else None
 
-class User(db.Model):
-    __tablename__ = 'users'
+    def update(self, data):
+        """
+        Update the user document at self.uid.
+        """
+        if not self.ref:
+            raise ValueError("User uid is not set.")
+        self.ref.update(data)
 
-    id: Mapped[str]  = mapped_column(db.UUID, primary_key=True, default=uuid4, unique=True)
-    name: Mapped[str] = mapped_column(db.Text)
-    phone_number: Mapped[str] = mapped_column(db.Text)
-    email: Mapped[str] = mapped_column(db.Text)
-    password: Mapped[str] = mapped_column(db.Text)
-    student_id: Mapped[str] = mapped_column(db.Text)
-    user_type: Mapped[UserType]
-    gender: Mapped[Gender]
+    def delete(self):
+        """
+        Delete the user document at self.uid.
+        """
+        if not self.ref:
+            raise ValueError("User uid is not set.")
+        self.ref.delete()
 
-    client: Mapped[Optional['Client']] = relationship('Client', lazy=True, cascade="all, delete-orphan", back_populates='user')
-    customer: Mapped[Optional['Customer']] = relationship('Customer', lazy=True, cascade="all, delete-orphan", back_populates='user')
-    anjem_orders: Mapped[Optional['AnjemOrder']] = relationship('AnjemOrder', lazy=True, back_populates='user')
-    
-    def __init__(self, name=None, phone_number=None, email=None, password=None, student_id=None, type=None, gender=None, id=None):
-        self.id = id
-        self.name = name
-        self.phone_number = phone_number
-        self.email = email
-        self.password = password
-        self.student_id = student_id
-        self.user_type = UserType[type]
-        self.gender = Gender[gender]
+    @staticmethod
+    def create_user(data):
+        """
+        Create a new user document with an auto-generated uid and return its data.
+        """
+        new_ref = db.collection("users").document()  # auto-generated ID
+        new_ref.set(data)
+        return {"uid": new_ref.id, **new_ref.get().to_dict()}
 
-    def json(self, deep: UserType = None):
-        base = {
-            'id': str(self.id),
-            'name': self.name,
-            'phone_number': self.phone_number,
-            'email': self.email,
-            'student_id': self.student_id,
-            'type': self.user_type.value,
-            'gender': self.gender.value,
-        }
+    @staticmethod
+    def exists(data):
+        """
+        Check if a user exists by email or username.
+        Returns dictionary indicating existence and matched fields.
+        """
+        email_query = db.collection("users")\
+                        .where("email", "==", data.get("email"))\
+                        .limit(1)
+        username_query = db.collection("users")\
+                        .where("username", "==", data.get("username"))\
+                        .limit(1)
 
-        if deep == UserType.CLIENT:
+        email_results = email_query.get()
+        username_results = username_query.get()
+
+        user_email = email_results[0].to_dict() if email_results else None
+        user_username = username_results[0].to_dict() if username_results else None
+
+        if user_email or user_username:
             return {
-                **base,
-                **self.client.json()
+                "exists": True,
+                "by_email": bool(user_email),
+                "by_username": bool(user_username),
+                "user_email": user_email,
+                "user_username": user_username
             }
-        elif deep == UserType.CUSTOMER:
-            return {
-                **base,
-                **self.customer.json()
-            }
-        else: 
-            return base
 
-class Client(db.Model):
-    __tablename__ = 'clients'
-    
-    user_id: Mapped[str] = mapped_column(db.UUID, ForeignKey('users.id'), primary_key=True)
-    interest: Mapped[Optional[str]] = mapped_column(db.Text)
-    bank_account: Mapped[str] = mapped_column(db.Text)
-    bank_name: Mapped[str] = mapped_column(db.Text)
-    ktm: Mapped[Optional[str]] = mapped_column(db.Text)
-    anjem_status: Mapped[AnjemDriverStatus] = mapped_column(db.Enum(AnjemDriverStatus), default=AnjemDriverStatus.OFFLINE.value)
-    verification_status: Mapped[bool] = mapped_column(db.Boolean, default=True)
-
-    user: Mapped[User] = relationship('User', back_populates='client')
-
-    def __init__(self, user_id, bank_account, bank_name, ktm, anjem_status=AnjemDriverStatus.OFFLINE.value, verification_status=False, interest=None):
-        self.user_id = user_id
-        self.interest = interest
-        self.bank_account = bank_account
-        self.bank_name = bank_name
-        self.ktm = ktm
-        self.anjem_status = AnjemDriverStatus[anjem_status]
-        self.verification_status = verification_status
-    
-    def json(self):
-        return {
-            'user_id': str(self.user_id),
-            'interest': self.interest,
-            'bank_account': self.bank_account,
-            'bank_name': self.bank_name,
-            'anjem_status': self.anjem_status.value,
-            'ktm': self.ktm,
-            'verification_status': self.verification_status,
-        }
-
-class Customer(db.Model):
-    __tablename__ = 'customers'
-
-    user_id: Mapped[str] = mapped_column(db.UUID, ForeignKey('users.id'), primary_key=True)
-    interest: Mapped[Optional[str]] = mapped_column(db.Text)
-
-    user: Mapped[User] = relationship('User', back_populates='customer')
-
-    def __init__(self, user_id, interest):
-        self.user_id = user_id
-        self.interest = interest
-
-    def json(self):
-        return {
-            'user_id': str(self.user_id),
-            'interest': self.interest,
-        }
+        return {"exists": False}

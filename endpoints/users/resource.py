@@ -3,7 +3,8 @@ from flask import g as ctx
 from uuid import UUID, uuid4
 from app import app
 
-from .model import User, Client, Customer, UserType
+from firebase.config import db
+from .model import User
 from .validate import post_parser, patch_parser
 from utils.validate import *
 from utils.response import response, abort
@@ -17,133 +18,91 @@ class UserResource(Resource):
             
             err = validate_email(args['email'])
             if err:
-                raise err
-
-            err = validate_phone_number(args['phone_number'])
-            if err:
-                raise err
-
-            if args['type'] == 'CLIENT':
-                if args['ktm'] is None:
-                    raise Exception("image `ktm` is required")
-                else:
-                    ktm = args['ktm']
-                    if not allowed_file(ktm.filename):
-                        raise Exception("file extension is not allowed")
-                if args['bank_account'] is None or args['bank_account'] == "":
-                    raise Exception("str `bank_account` is required")
-                if args['bank_name'] is None or args['bank_name'] == "":
-                    raise Exception("str `bank_name` is required")
-                ba = args['bank_account']
-                bn = args['bank_name']
-
-                if args['interest'] is None:
-                    raise Exception("str `interets` is required")
-                else:
-                    interest = args['interest']
-            
-            if args['type'] == 'CUSTOMER':
-                if args['interest'] is None:
-                    raise Exception("str `interest` is required")
-                else:
-                    interest = args['interest']
-            
-            del args['bank_account']
-            del args['bank_name']
-            del args['interest']
-            del args['ktm']
-        except Exception as e: 
+                raise Exception(err)
+        
+        except Exception as e:
             return abort("validation failure", 400, e)
+        
+        email = args.get('email')
+        username = args.get('username')
 
-        user = User.query.filter_by(email=args['email'], user_type=args['type']).first()
-        if user is not None:
-            return abort("email already registered", 400, None)
+        # Check email
+        email_query = db.collection("users")\
+                        .where("email", "==", email)\
+                        .limit(1)
+        email_results = email_query.get()
+        for doc in email_results:
+            if doc.id != ctx.user_id:
+                return abort("email already registered", 400, None)
+
+        # Check username
+        username_query = db.collection("users")\
+                        .where("username", "==", username)\
+                        .limit(1)
+        username_results = username_query.get()
+        if username_results:
+            return abort("username already registered", 400, None)
 
         args['password'] = hash_password(args['password'])
-        user = User(**args)
-        # db.session.add(user)
-        # db.session.commit() # TODO: NOT ATOMIC
-        
-        resp = user.json()
-        userid = resp['id']
+        user = User.create_user(args)
 
-        if args['type'] == 'CLIENT':
-            path = f"{app.config['UPLOAD_FOLDER'] }/ktm/{ktm.filename}"
-            ktm.save(path)
-            client = Client(userid, ba, bn, path, interest=interest)
-            resp['ktm'] = client.ktm
-            # db.session.add(client)
-        if args['type'] == 'CUSTOMER':
-            customer = Customer(userid, interest)
-            # db.session.add(customer)
-        # db.session.commit() # TODO: NOT ATOMIC
-
-        return response("created successfully", 201, data=resp)
+        return response("created successfully", 201, data=user)
 
     @authenticate
     def patch(self):
-        current_user = User.query.get(ctx.user_id)
-        client_args = {}
-        customer_args = {}
-        ktm = None
+        current_user = User(ctx.user_id).get()
 
         try:
             args = patch_parser.parse_args()
             
-            if (args['email'] is not None or args['email'] != "") and args['email'] != current_user.email:
-                err = validate_email(args['email'])
-                if err:
-                    raise err
-                
-                user = User.query.filter_by(email=args['email'], user_type=args['type']).first()
-                if user is not None:
-                    return abort("email already registered", 400, None)
-            else:
-                del args['email']
+            # Assume current_user_data is a dict of current user info
 
-            if args['phone_number'] is not None or args['phone_number'] != "":
+            email = args.get('email')
+            username = args.get('username')
+
+            # Check email
+            if email and email != current_user.get('email'):
+                err = validate_email(email)
+                if err:
+                    raise Exception(err)
+
+                email_query = db.collection("users")\
+                                .where("email", "==", email)\
+                                .limit(1)
+                email_results = email_query.get()
+                for doc in email_results:
+                    if doc.id != ctx.user_id:
+                        return abort("email already registered", 400, None)
+            else:
+                args.pop('email', None)  # remove 'email' from args if no change
+
+            # Check username
+            if username and username != current_user.get('username'):
+                username_query = db.collection("users")\
+                                .where("username", "==", username)\
+                                .limit(1)
+                username_results = username_query.get()
+                for doc in username_results:
+                    # If a document exists and it's not the current user, abort
+                    if doc.id != ctx.user_id:
+                        return abort("username already registered", 400, None)
+            else:
+                args.pop('username', None)  # remove 'username' from args if no change
+
+
+            if args.get('phone_number') and args['phone_number'] != current_user.get('phone_number'):
                 err = validate_phone_number(args['phone_number'])
                 if err:
-                    raise err
-            else: 
-                del args['phone_number']
+                    raise Exception(err)
+            else:
+                args.pop('phone_number', None)
 
-            if ctx.role == UserType.CLIENT.value:
-                if args['ktm'] is not None:
-                    ktm = args['ktm']
-                    if not allowed_file(ktm.filename):
-                        raise Exception("file extension is not allowed")
-                if args['bank_account'] is not None or args['bank_account'] != "":
-                    client_args['bank_account'] = args['bank_account']
-                if args['bank_name'] is not None or args['bank_name'] != "":
-                    client_args['bank_name'] = args['bank_name']
-                if args['interest'] is not None:
-                    client_args['interest'] = args['interest']
-            if ctx.role == UserType.CUSTOMER.value:
-                if args['interest'] is not None:
-                    customer_args['interest'] = args['interest']
-            
-            del args['bank_account']
-            del args['bank_name']
-            del args['interest']
-            del args['ktm']
-        except Exception as e: 
+        except Exception as e:
             return abort("validation failure", 400, e)
         
         # remove blank fields
         args = {k: v for k, v in args.items() if v is not None} 
-        User.query.filter_by(id=ctx.user_id).update(args)
+        User(ctx.user_id).update(args)
+        user = User(ctx.user_id).get()
 
-        if ctx.role == UserType.CLIENT.value:
-            if ktm is not None:
-                path = f"{app.config['UPLOAD_FOLDER'] }/ktm/{ctx.user_id}-{ktm.filename}"
-                ktm.save(path)
-                client_args['ktm'] = path
-                client = Client.query.filter_by(user_id=ctx.user_id).update(client_args)
-            args.update(client_args)
-        elif ctx.role == UserType.CUSTOMER.value:
-            customer = Customer.query.filter_by(user_id=ctx.user_id).update(customer_args)
-            args.update(customer_args)
-
-        # db.session.commit()
-        return response("updated successfully", 201, data=args)
+        return response("updated successfully", 201, data=user)

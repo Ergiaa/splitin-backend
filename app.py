@@ -1,8 +1,6 @@
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 from flask_restful import Api
-from flask_migrate import Migrate
-from flask_sqlalchemy import SQLAlchemy
 import settings
 
 # ===================
@@ -10,27 +8,25 @@ import settings
 # ===================
 app = Flask(__name__)
 CORS(app, origins=settings.CORS_ORIGINS)
-app.config['SQLALCHEMY_DATABASE_URI'] = settings.SQLALCHEMY_DATABASE_URI
+
+# Firebase-based project: no SQLAlchemy setup
 app.config['SECRET_KEY'] = settings.SECRET_KEY
 app.config['BUNDLE_ERRORS'] = settings.BUNDLE_ERRORS
 app.config['UPLOAD_FOLDER'] = settings.STATIC_DIRECTORY
 
 # ===================
+# RESTful API setup
+# ===================
+api = Api(app)
+
+# ===================
 # Error Handling
 # ===================
 from utils.response import abort
+
 @app.errorhandler(Exception)
 def handle_error(e):
     return abort("internal server error", 500, e)
-
-# ===================
-# Init Firebase
-# ===================
-import firebase_admin
-from firebase_admin import credentials
-cred = credentials.Certificate("key.json")
-firebase_admin.initialize_app(cred)
-
 
 # ===================
 # Static Routes
@@ -42,13 +38,16 @@ def send_file(path):
 # ===================
 # API Endpoint Routes
 # ===================
-# from endpoints.ping.resource import PingResource
-# from endpoints.auth.resource import AuthResource
-# from endpoints.users.resource import UserResource
+from endpoints.ping.resource import PingResource
+from endpoints.auth.resource import AuthResource
+from endpoints.users.resource import UserResource
 
-# api.add_resource(PingResource, '/', '/ping')
-# api.add_resource(AuthResource, '/auth', '/auth/<string:id>')
-# api.add_resource(UserResource, '/user')
+api.add_resource(PingResource, '/', '/ping')
+api.add_resource(AuthResource, '/auth')
+api.add_resource(UserResource, '/user', '/user/<string:id>')  # handles both get/patch
 
+# ===================
+# Entry Point
+# ===================
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)

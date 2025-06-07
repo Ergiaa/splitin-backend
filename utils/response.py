@@ -1,4 +1,4 @@
-def response(message: str, status_code: int, data: dict = None, meta: dict = None) -> (dict, int):
+def response(message: str, status_code: int, data: dict = None, meta: dict = None, error: Exception = None) -> tuple[dict, int]:
     response = {
         'status': True,
         'message': message
@@ -6,7 +6,10 @@ def response(message: str, status_code: int, data: dict = None, meta: dict = Non
     
     if status_code >= 400:
         response['status'] = False
-        response['error'] = error
+        if error and hasattr(error, 'data') and 'message' in error.data:
+            response['error'] = error.data['message']
+        elif error:
+            response['error'] = str(error)
 
     if data:
         response['data'] = data
@@ -18,7 +21,7 @@ def response(message: str, status_code: int, data: dict = None, meta: dict = Non
 
     return (response, status_code)
 
-def abort(message: str, status_code: int, error: Exception = None) -> (dict, int):
+def abort(message: str, status_code: int, error: Exception = None) -> tuple[dict, int]:
     response = {
         'status': False,
         'message': message

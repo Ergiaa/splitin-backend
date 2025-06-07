@@ -21,7 +21,6 @@ def authenticate(f):
             return abort('Invalid token', 401, error)
 
         ctx.user_id = payload['user_id']
-        ctx.role = payload['user_type']
 
         return f(*args, **kwargs)
     return decorated_function
