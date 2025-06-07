@@ -1,7 +1,7 @@
 from flask_restful import Resource, request
 from flask import g as ctx
 from uuid import UUID, uuid4
-from app import db, app
+from app import app
 
 from .model import User, Client, Customer, UserType
 from .validate import post_parser, patch_parser
@@ -61,8 +61,8 @@ class UserResource(Resource):
 
         args['password'] = hash_password(args['password'])
         user = User(**args)
-        db.session.add(user)
-        db.session.commit() # TODO: NOT ATOMIC
+        # db.session.add(user)
+        # db.session.commit() # TODO: NOT ATOMIC
         
         resp = user.json()
         userid = resp['id']
@@ -72,11 +72,11 @@ class UserResource(Resource):
             ktm.save(path)
             client = Client(userid, ba, bn, path, interest=interest)
             resp['ktm'] = client.ktm
-            db.session.add(client)
+            # db.session.add(client)
         if args['type'] == 'CUSTOMER':
             customer = Customer(userid, interest)
-            db.session.add(customer)
-        db.session.commit() # TODO: NOT ATOMIC
+            # db.session.add(customer)
+        # db.session.commit() # TODO: NOT ATOMIC
 
         return response("created successfully", 201, data=resp)
 
@@ -145,5 +145,5 @@ class UserResource(Resource):
             customer = Customer.query.filter_by(user_id=ctx.user_id).update(customer_args)
             args.update(customer_args)
 
-        db.session.commit()
+        # db.session.commit()
         return response("updated successfully", 201, data=args)

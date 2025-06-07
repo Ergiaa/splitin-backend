@@ -1,0 +1,5 @@
+flask-cors==6.0.0
+Flask==3.1.1
+Flask-Migrate==4.1.0
+Flask-RESTful==0.3.10
+firebase-admin==6.9.0

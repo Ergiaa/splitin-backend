@@ -1,6 +1,6 @@
 from flask_restful import Resource, request
 from flask import g as ctx
-from app import db
+# from app import db
 
 from .validate import login_parser
 from endpoints.users.model import User, Client, Customer, UserType    

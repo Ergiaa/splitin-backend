@@ -1,7 +1,0 @@
-FLASK_RUN_PORT = 8000
-SQLALCHEMY_DATABASE_URI = "dialect://username:password@host:port/database"
-SECRET_KEY = "secret"
-BUNDLE_ERRORS = True
-STATIC_DIRECTORY = "static"
-CORS_ORIGINS = ["*"]
-RUN_SEEDERS = False

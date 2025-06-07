@@ -24,12 +24,13 @@ def handle_error(e):
     return abort("internal server error", 500, e)
 
 # ===================
-# Extension & ORM
+# Init Firebase
 # ===================
-from common.base import Base
-db = SQLAlchemy(app, model_class=Base)
-api = Api(app)
-api.prefix = '/api'
+import firebase_admin
+from firebase_admin import credentials
+cred = credentials.Certificate("key.json")
+firebase_admin.initialize_app(cred)
+
 
 # ===================
 # Static Routes
@@ -41,13 +42,13 @@ def send_file(path):
 # ===================
 # API Endpoint Routes
 # ===================
-from endpoints.ping.resource import PingResource
-from endpoints.auth.resource import AuthResource
-from endpoints.users.resource import UserResource
+# from endpoints.ping.resource import PingResource
+# from endpoints.auth.resource import AuthResource
+# from endpoints.users.resource import UserResource
 
-api.add_resource(PingResource, '/', '/ping')
-api.add_resource(AuthResource, '/auth', '/auth/<string:id>')
-api.add_resource(UserResource, '/user')
+# api.add_resource(PingResource, '/', '/ping')
+# api.add_resource(AuthResource, '/auth', '/auth/<string:id>')
+# api.add_resource(UserResource, '/user')
 
 if __name__ == '__main__':
     app.run()

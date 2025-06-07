@@ -1,11 +1,11 @@
-from app import db
+# from app import db
 from enum import Enum
 from uuid import uuid4
 from typing import Optional
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from endpoints.anjem.model import AnjemDriverStatus
+# from endpoints.anjem.model import AnjemDriverStatus
 
 class UserType(Enum):
     CLIENT = "client"
