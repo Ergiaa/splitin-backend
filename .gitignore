@@ -1,5 +1,57 @@
-settings.py
-.venv
-migrations
-static
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+*.env
+
+# Firebase key (should never be tracked)
 key.json
+
+# Flask-related files
+instance/
+*.db
+*.sqlite3
+
+# Migrations (only if you want to exclude auto-generated migration history)
+migrations/
+
+# VSCode settings (optional)
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Static/cache files
+static/*.cache
+*.log
+
+# Pytest cache
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+coverage.xml
+
+# pip-tools
+*.txt~
+
+# Compiled C extensions
+*.so
+
+# dotenv files
+.env.*
+.env
+
+# settings files
+settings.py
+
+# Gunicorn / Uvicorn logs
+gunicorn.log

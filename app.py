@@ -1,6 +1,7 @@
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 from flask_restful import Api
+from resources import init_resources
 import settings
 
 # ===================
@@ -38,13 +39,7 @@ def send_file(path):
 # ===================
 # API Endpoint Routes
 # ===================
-from endpoints.ping.resource import PingResource
-from endpoints.auth.resource import AuthResource
-from endpoints.users.resource import UserResource
-
-api.add_resource(PingResource, '/', '/ping')
-api.add_resource(AuthResource, '/auth')
-api.add_resource(UserResource, '/user', '/user/<string:id>')  # handles both get/patch
+init_resources(api)
 
 # ===================
 # Entry Point
