@@ -69,3 +69,12 @@ class UserService:
             err = validate_phone_number(phone_number)
             if err:
                 raise CustomError(err, 400)
+        
+        # Update user data
+        user = User(ctx.user_id)
+        user.update(args)
+
+        updated_user = user.get()
+        updated_user.pop("password", None)  # Remove password from response
+
+        return updated_user

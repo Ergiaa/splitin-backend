@@ -1,4 +1,5 @@
 from firebase.config import db
+from uuid import uuid4
 
 class Bill:
     def __init__(self, uid=None):
@@ -6,8 +7,8 @@ class Bill:
         If uid is provided, points to that user document.
         If uid is None, instance won't be tied to a specific document (use create_user instead).
         """
-        self.uid = uid
-        self.ref = db.collection("bills").document(uid) if uid else None
+        self.uid = uid or str(uuid4())
+        self.ref = db.collection("bills").document(self.uid)
 
     def create(self, data):
         """
@@ -24,7 +25,44 @@ class Bill:
         if not self.ref:
             raise ValueError("User uid is not set.")
         doc = self.ref.get()
-        return doc.to_dict() if doc.exists else None
+        if doc.exists:
+            data = doc.to_dict()
+            data["id"] = self.uid
+            return data
+        return None
+    
+    def get_payments(self):
+        """
+        Get all payments associated with this bill.
+        """
+        if not self.ref:
+            raise ValueError("Bill uid is not set.")
+        payments_ref = self.ref.collection("payments")
+        payments = [doc.to_dict() for doc in payments_ref.stream()]
+        return payments
+    
+    def get_items(self):
+        """
+        Get all items associated with this bill.
+        """
+        if not self.ref:
+            raise ValueError("Bill uid is not set.")
+        items_ref = self.ref.collection("items")
+        items = [doc.to_dict() for doc in items_ref.stream()]
+        return items
+    
+    def get_participants(self):
+        """
+        Get all participants associated with this bill, including their document IDs.
+        """
+        if not self.ref:
+            raise ValueError("Bill uid is not set.")
+        participants_ref = self.ref.collection("participants")
+        participants = [
+            {**doc.to_dict(), "participant_id": doc.id} for doc in participants_ref.stream()
+        ]
+        return participants
+
 
     def update(self, data):
         """
@@ -42,10 +80,10 @@ class Bill:
             raise ValueError("User uid is not set.")
         self.ref.delete()
 
-    def create_bill(self, data):
+    @staticmethod
+    def create_ref():
         """
-        Create a new bill document with an auto-generated uid and return its data.
+        Create a new bill document with an auto-generated uid and return its reference.
         """
         new_ref = db.collection("bills").document()
-
         return new_ref

@@ -1,4 +1,5 @@
 from firebase.config import db
+from uuid import uuid4
 
 class User:
     def __init__(self, uid=None):
@@ -6,8 +7,8 @@ class User:
         If uid is provided, points to that user document.
         If uid is None, instance won't be tied to a specific document (use create_user instead).
         """
-        self.uid = uid
-        self.ref = db.collection("users").document(uid) if uid else None
+        self.uid = uid or str(uuid4())
+        self.ref = db.collection("users").document(self.uid)
 
     def create(self, data):
         """
@@ -24,7 +25,11 @@ class User:
         if not self.ref:
             raise ValueError("User uid is not set.")
         doc = self.ref.get()
-        return doc.to_dict() if doc.exists else None
+        if doc.exists:
+            data = doc.to_dict()
+            data["id"] = self.uid  # Include uid in the returned data
+            return data
+        return None
 
     def update(self, data):
         """
