@@ -18,7 +18,8 @@ class LedgerResource(Resource):
             return abort(e.message, e.status_code)
         except Exception as e:
             return abort(str(e), 500, error=e)
-
+        
+    @authenticate
     def patch(self, ledger_id):
         try:
             data = ledger_service.settle_debt(ledger_id=ledger_id, user_id=ctx.user_id)

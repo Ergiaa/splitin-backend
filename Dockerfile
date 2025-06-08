@@ -1,27 +1,12 @@
-FROM python:3.11-slim
+FROM google/cloud-sdk:emulators
 
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Install curl, nodejs, npm
+RUN apt-get update && apt-get install -y curl \
+  && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+  && apt-get install -y nodejs \
+  && npm install -g firebase-tools \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /var/www/app/static/ktm
-RUN mkdir -p /var/www/app/static/products
-RUN mkdir -p /var/www/app/static/jastip
-RUN mkdir -p /var/www/app/static/anjem
-RUN mkdir -p /var/www/app/static/anjem/chat
-COPY . /var/www/app
-WORKDIR /var/www/app
-
-RUN pip install pipenv
-RUN pipenv --python /usr/local/bin/python3.11
-RUN pipenv install --system --deploy
-# RUN pipenv run flask --app manage db init
-# RUN pipenv run flask --app manage db migrate
-# RUN pipenv run flask --app manage db upgrade
-
-# CMD ["pipenv", "run", "flask", "--app", "app", "run"]
-# Define the command to run your application
-RUN pip install gunicorn
-EXPOSE 8000 
-CMD ["pipenv", "run", "gunicorn", "-b", "0.0.0.0:8000", "app:app"]
+# Your existing commands
+CMD ["gcloud", "config", "set", "project", "splitin-firebase"]
+# (then start emulator, or override in docker-compose)

@@ -30,6 +30,22 @@ class UserService:
         user.pop("password", None)
 
         return user
+    
+    def get_user_by_username(self, prefix):
+        users = db.collection("users").where("username", ">=", prefix).where("username", "<", prefix + "\uf8ff").get()
+
+        if users == []:
+            raise CustomError("no user found", 404)
+
+        resp = []
+        for user in users:
+            data = user.to_dict()
+            data.pop('password')
+            data['id'] = user.id
+
+            resp.append(data)
+
+        return resp
 
     def update_user(self):
         current_user = User(ctx.user_id).get()

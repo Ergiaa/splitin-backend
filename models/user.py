@@ -2,59 +2,60 @@ from firebase.config import db
 from uuid import uuid4
 
 class User:
-    def __init__(self, uid=None):
+    def __init__(self, id=None):
         """
         If uid is provided, points to that user document.
         If uid is None, instance won't be tied to a specific document (use create_user instead).
         """
-        self.uid = uid or str(uuid4())
-        self.ref = db.collection("users").document(self.uid)
+        self.id = id or str(uuid4())
+        self.ref = db.collection("users").document(self.id)
 
     def create(self, data):
         """
-        Create or overwrite the user document at self.uid.
+        Create or overwrite the user document at self.id.
         """
         if not self.ref:
-            raise ValueError("User uid is not set. Use create_user() for new users.")
+            raise ValueError("User id is not set. Use create_user() for new users.")
         self.ref.set(data)
 
     def get(self):
         """
-        Get the user data dictionary for self.uid.
+        Get the user data dictionary for self.id.
         """
         if not self.ref:
-            raise ValueError("User uid is not set.")
+            raise ValueError("User id is not set.")
         doc = self.ref.get()
         if doc.exists:
             data = doc.to_dict()
-            data["id"] = self.uid  # Include uid in the returned data
+            data.pop('password')
+            data["id"] = self.id  # Include id in the returned data
             return data
         return None
 
     def update(self, data):
         """
-        Update the user document at self.uid.
+        Update the user document at self.id.
         """
         if not self.ref:
-            raise ValueError("User uid is not set.")
+            raise ValueError("User id is not set.")
         self.ref.update(data)
 
     def delete(self):
         """
-        Delete the user document at self.uid.
+        Delete the user document at self.id.
         """
         if not self.ref:
-            raise ValueError("User uid is not set.")
+            raise ValueError("User id is not set.")
         self.ref.delete()
 
     @staticmethod
     def create_user(data):
         """
-        Create a new user document with an auto-generated uid and return its data.
+        Create a new user document with an auto-generated id and return its data.
         """
         new_ref = db.collection("users").document()  # auto-generated ID
         new_ref.set(data)
-        return {"uid": new_ref.id, **new_ref.get().to_dict()}
+        return {"id": new_ref.id, **new_ref.get().to_dict()}
 
     @staticmethod
     def exists(data):

@@ -10,5 +10,6 @@ BUNDLE_ERRORS = True
 # File upload path
 STATIC_DIRECTORY = "static"
 
-# Firebase config path (optional if used)
-FIREBASE_CREDENTIAL_PATH = "firebase/your-firebase-adminsdk.json"
+# Firebase configuration (no env vars)
+USE_FIRESTORE_EMULATOR = True  # Set this to False for production
+FIRESTORE_EMULATOR_HOST = "localhost:8080"

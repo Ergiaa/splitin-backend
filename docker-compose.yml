@@ -1,49 +1,14 @@
+version: "3.8"
 services:
-  app:
-    container_name: splitin-backend
-    hostname: splitin-backend
+  firestore:
     build:
       context: .
       dockerfile: Dockerfile
-    environment:
-      - TZ=Asia/Jakarta
     ports:
-      - 8800:8000
-    # depends_on:
-    #   - postgres
-    restart: unless-stopped
-    # links: 
-    #   - postgres
-    extra_hosts:
-      - host.docker.internal:host-gateway
+      - "4000:4000" # Emulator UI
+      - "8080:8080" # Firestore port
     volumes:
-      - ./migrations:/var/www/app/migrations
-      - ./static:/var/www/app/static
-  
-  app_dev:
-    container_name: splitin-backend-dev
-    hostname: splitin-backend-dev
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      - TZ=Asia/Jakarta
-    ports:
-      - 8802:8000
-    restart: unless-stopped
-    extra_hosts:
-      - host.docker.internal:host-gateway
-    volumes:
-      - ./migrations:/var/www/app/migrations
-      - ./static:/var/www/app/static
-
-  # postgres:
-  #   container_name: splitin-db
-  #   hostname: splitin-db
-  #   image: postgres:latest
-  #   ports:
-  #     - 5432:5432
-  #   environment:
-  #     - POSTGRES_USER=cawk
-  #     - POSTGRES_PASSWORD=cawk
-  #     - POSTGRES_DB=cawk
+      - ./firebase-data:/home/firebase/.firebase
+    command: >
+      bash -c "gcloud config set project splitin-firebase &&
+               gcloud emulators firestore start --host-port=0.0.0.0:8080"

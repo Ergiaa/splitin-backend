@@ -1,8 +1,9 @@
 from datetime import datetime
-from models import Bill, Groups, Items, Assignments, Participants, Payments, Ledgers
+from models import Bill, Groups, Items, Assignments, Participants, Payments, Ledgers, User
 from utils.error import CustomError
 from flask import g as ctx
 from utils.clean import clean_datetime
+
 class BillService:
     def create_bill(self):
         ref = Bill.create_ref()
@@ -10,11 +11,11 @@ class BillService:
         participant = [ctx.user_id]
 
         data = {
-            'bill_name': f'Split Bill-{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}-{ref.id}',
+            'bill_name': f'split_bill-{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}-{ref.id}',
             'created_by': ctx.user_id,
             'join_code': ref.id,
             'participants': participant,
-            'isFinalized': False,
+            'is_finalized': False,
         }
 
         ref.set(data)
@@ -25,32 +26,33 @@ class BillService:
         ref = Bill.create_ref()
 
         if not args.get('group_id'):
-          participant = [ctx.user_id]
-          for i in args.get('participants', []):
-              if i not in participant:
-                  participant.append(i)
+            participant = [ctx.user_id]
+            for i in args.get('participants', []):
+                if i not in participant:
+                    participant.append(i)
         else:
-          group_ref = Groups(args['group_id'])
-          group_data = group_ref.get()
+            group_ref = Groups(args['group_id'])
+            group_data = group_ref.get()
 
-          if not group_data:
-              raise CustomError("group not found", 404)
+            if not group_data:
+                raise CustomError("group not found", 404)
 
-          participant = group_data.get('members', [])
-          if ctx.user_id not in participant:
-              participant.append(ctx.user_id)
+            # Group will be the source of participants; no need to store them in the bill.
+            participant = None  # explicitly ignore participants in bill
 
         split_type = args.get('split_type', 'equal')
-        
+
         bill_data = {
-            'bill_name': f'Split Bill-{datetime.now().strftime("%Y-%m-%d-%H:%M:%S")}-{ref.id}',
+            'bill_name': f'split_bill-{datetime.now().strftime("%Y-%m-%d-%H:%M:%S")}-{ref.id}',
             'created_by': ctx.user_id,
             'group_id': args.get('group_id', None),
             'join_code': ref.id,
-            'participants': participant,
             'split_type': split_type,
-            'isFinalized': True,
+            'is_finalized': True,
         }
+
+        if not args.get('group_id'):
+            bill_data['participants'] = participant  # only include this when there's no group
 
         ref.set(bill_data)
 
@@ -63,11 +65,11 @@ class BillService:
             item_data.append({
                 'id': item_ref.id,
                 'name': item.get('name'),
-                'unitPrice': item.get('unitPrice'),
-                'totalQuantity': item.get('totalQuantity', 1),
+                'unit_price': item.get('unit_price'),
+                'total_quantity': item.get('total_quantity', 1),
             })
 
-            total_price += item.get('unitPrice', 0) * item.get('totalQuantity', 1)
+            total_price += item.get('unit_price', 0) * item.get('total_quantity', 1)
 
             item_ref.set(item_data[-1])
 
@@ -81,18 +83,16 @@ class BillService:
                         user_id=assignment.get('user_id')
                     )
 
-
                     assignment_ref.set({
-                        'user_id':assignment.get('user_id'),
-                        'quantity':assignment.get('quantity', 1),
+                        'user_id': assignment.get('user_id'),
+                        'quantity': assignment.get('quantity', 1),
                     })
 
         ref.update({
-            'totalPrice': total_price,
+            'total_price': total_price,
         })
 
         if split_type == 'equal':
-            # For equal split, assign total price to each participant
             per_person_amount = total_price / len(participant)
 
             for user_id in participant:
@@ -105,14 +105,14 @@ class BillService:
             items = Bill(ref.id).get_items()
             participant_dict = {}
             for item in items:
-                assignment_ref = Items(bill_id=ref.id, uid=item['id']).get_assignments()
+                assignment_ref = Items(bill_id=ref.id, id=item['id']).get_assignments()
 
                 for assignment in assignment_ref:
-                    total_price = item['unitPrice'] * assignment['quantity']
+                    total_price_item = item['unit_price'] * assignment['quantity']
                     if assignment['user_id'] not in participant_dict:
-                        participant_dict[assignment['user_id']] = total_price
+                        participant_dict[assignment['user_id']] = total_price_item
                     else:
-                        participant_dict[assignment['user_id']] += total_price
+                        participant_dict[assignment['user_id']] += total_price_item
             for participant_id, amount in participant_dict.items():
                 participant_ref = Participants.create_ref(bill_id=ref.id, participant_id=participant_id)
                 participant_ref.create({
@@ -129,11 +129,12 @@ class BillService:
             })
 
         response = ref.get().to_dict()
+        response['id'] = ref.id
         response['items'] = Bill(ref.id).get_items()
         for item in response['items']:
-            item['assignments'] = Items(bill_id=ref.id, uid=item['id']).get_assignments()
+            item['assignments'] = Items(bill_id=ref.id, id=item['id']).get_assignments()
         response['payments'] = Bill(ref.id).get_payments()
-        response['participants'] = Bill(ref.id).get_participants()
+        response['participants_data'] = Bill(ref.id).get_participants()
         response['ledgers'] = self.create_ledgers(bill_id=ref.id)
 
         return response
@@ -147,10 +148,10 @@ class BillService:
         participants = Bill(bill_id).get_participants()
         payments = Bill(bill_id).get_payments()
         
-        if participants is None or participants == []:
+        if not participants:
             raise CustomError("no participants in the bill", 400)
         
-        if payments is None or payments == []:
+        if not payments:
             raise CustomError("no payments in the bill", 400)
         
         paid_data = {}
@@ -168,8 +169,6 @@ class BillService:
 
             net_data[user] = round(paid - owed, 2)
 
-
-
         debtors = {u: a for u, a in net_data.items() if a < 0}
         creditors = {u: a for u, a in net_data.items() if a > 0}
 
@@ -181,11 +180,11 @@ class BillService:
                     continue
                 payment = min(debt_remaining, credit_amount)
                 ledgers.append({
-                    "debtorUserId": debtor,
-                    "creditorUserId": creditor,
+                    "debtor_user_id": debtor,
+                    "creditor_user_id": creditor,
                     "amount": round(payment, 2),
-                    "isPaid": False,
-                    "billId": bill_id,
+                    "is_paid": False,
+                    "bill_id": bill_id,
                 })
                 debt_remaining -= payment
                 creditors[creditor] -= payment
@@ -199,16 +198,70 @@ class BillService:
         return Ledgers.get_ledgers_by_bill(bill_id)
 
     def get_bill(self, bill_id):
-        ref = Bill(bill_id)
-        data = ref.get()
+        bill = Bill(bill_id)
+        data = bill.get()
 
         if not data:
             raise CustomError("bill not found", 404)
 
-        if data.get('isFinalized', False):
-            raise CustomError("bill is finalized", 403)
+        if data.get('is_finalized', True) is False:
+            raise CustomError("bill is a draft", 403)
+        
+        payments = bill.get_payments()
+        participants = bill.get_participants()
+        items = bill.get_items()
+        for i in items:
+            i['assignments'] = Items(bill_id=bill.id, id=i['item_id']).get_assignments()
 
-        return data
+        resp = {
+            **data,
+            'payments': payments,
+            'participants_data': participants,
+            'items': items
+        }
+
+        return resp
+    
+    def get_all_bill(self, user_id):
+        bills = Bill.get_all(user_id)
+        resp = []
+        for data in bills:
+            if not data:
+                raise CustomError("bill not found", 404)
+
+            if data.get('is_finalized', True) is False:
+                raise CustomError("bill is a draft", 403)
+            
+            payments = Bill(data['id']).get_payments()
+            participants = Bill(data['id']).get_participants()
+            
+            users = []
+            for person in data['participants']:
+                user = User(person).get()
+                users.append(user)
+
+            total_credit = 0
+            for pay in payments:
+                if pay['paid_by'] == user_id:
+                    total_credit = pay['amount']
+                    break
+            
+            total_debt = 0
+            for p in participants:
+                if p['participant_id'] == user_id:
+                    total_debt = p['amount_owed']
+                    break
+
+            resp.append({
+                'bill_name': data['bill_name'],
+                'total_price': data['total_price'],
+                'total_debt': total_debt,
+                'total_credit': total_credit,
+                'created_at': data.get('created_at', '1999-01-01T00:00:00Z'),
+                'participants': users
+            })
+
+        return resp
 
     def join_bill(self, bill_id, user_id=None):
         ref = Bill(bill_id)
@@ -217,12 +270,11 @@ class BillService:
         if not data:
             raise CustomError("bill not found", 404)
         
-        if data.get('isFinalized', False):
+        if data.get('is_finalized', False):
             raise CustomError("bill is finalized", 403)
 
         participants = data.get('participants', [])
 
-        # Use ctx.user_id if user_id param is None
         join_user_id = user_id or ctx.user_id
 
         if join_user_id in participants:
@@ -230,10 +282,8 @@ class BillService:
 
         participants.append(join_user_id)
 
-        # Save the updated participants list back to DB
         ref.update({'participants': participants})
 
-        # Return updated data after append
         data['participants'] = participants
 
         return data

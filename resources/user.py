@@ -1,4 +1,5 @@
 from flask_restful import Resource
+from flask import request
 from utils.response import response, abort
 from utils.error import CustomError
 from middleware.auth import authenticate
@@ -21,6 +22,16 @@ class UserResource(Resource):
         try:
             updated_user = user_service.update_user()
             return response("updated successfully", 201, data=updated_user)
+        except CustomError as e:
+            return abort(e.message, e.status_code)
+        except Exception as e:
+            return abort(str(e), 500, error=e)
+
+    def get(self):
+        try:
+            username = request.args['username']
+            user = user_service.get_user_by_username(username)
+            return response("searched successfully", 201, data=user)
         except CustomError as e:
             return abort(e.message, e.status_code)
         except Exception as e:

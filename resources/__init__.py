@@ -8,6 +8,7 @@ from .completeBill import CompleteBillResource
 from .user import UserResource
 from .totalLedger import TotalLedgerResource
 from .ledger import LedgerResource
+from .homeBill import HomeBillResource
 
 def init_resources(api: Api):
     """
@@ -23,3 +24,4 @@ def init_resources(api: Api):
     api.add_resource(CompleteBillResource, '/bills/complete')
     api.add_resource(TotalLedgerResource, '/ledgers/total')
     api.add_resource(LedgerResource,'/ledgers', '/ledgers/<string:ledger_id>')
+    api.add_resource(HomeBillResource, '/bills/all')

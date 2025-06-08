@@ -25,7 +25,6 @@ class Assignments:
     def create(self, data):
         self.ref.set({
             **data,
-            "created_at": datetime.utcnow()
         })
         return self.get()
 

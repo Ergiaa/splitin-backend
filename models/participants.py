@@ -4,10 +4,10 @@ from uuid import uuid4
 from datetime import datetime
 
 class Participants:
-    def __init__(self, bill_id, participant_id=None):
+    def __init__(self, bill_id, id=None):
         self.bill_id = bill_id
-        self.participant_id = participant_id
-        self.ref = db.collection("bills").document(bill_id).collection("participants").document(participant_id) if participant_id else None
+        self.id = id
+        self.ref = db.collection("bills").document(bill_id).collection("participants").document(id) if id else None
 
     def get(self):
         if not self.ref:
@@ -15,14 +15,13 @@ class Participants:
         doc = self.ref.get()
         if doc.exists:
             data = doc.to_dict()
-            data["id"] = self.payment_id
+            data["id"] = self.id
             return data
         return None
 
     def create(self, data):
         self.ref.set({
             **data,
-            "created_at": datetime.utcnow()
         })
         return self.get()
 

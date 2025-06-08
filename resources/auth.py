@@ -22,7 +22,7 @@ class AuthResource(Resource):
     @authenticate
     def get(self):
         try:
-            user_data = auth_service.me()
+            user_data = auth_service.me(ctx.user_id)
             return response("auth success", 200, data=user_data)
         except Exception as e:
             return abort(str(e), 404)
