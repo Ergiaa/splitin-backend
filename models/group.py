@@ -36,3 +36,27 @@ class Groups:
         if not self.ref:
             raise ValueError("Group id is not set.")
         self.ref.delete()
+
+    @staticmethod
+    def get_all(user_id):
+        """
+        Get all groups that the user is a member of.
+        """
+        query = db.collection("groups").where("members", "array_contains", user_id)
+        results = query.stream()
+
+        res = []
+        for doc in results:
+            data = doc.to_dict()
+            data["id"] = doc.id
+            res.append(data)
+
+        return res
+    
+    @staticmethod
+    def create_ref():
+        """
+        Create a new group document with an auto-generated id and return its reference.
+        """
+        new_ref = db.collection("groups").document()
+        return new_ref

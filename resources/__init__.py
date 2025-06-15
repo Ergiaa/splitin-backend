@@ -9,6 +9,9 @@ from .user import UserResource
 from .totalLedger import TotalLedgerResource
 from .ledger import LedgerResource
 from .homeBill import HomeBillResource
+from .itemBill import ItemBillResource
+from .draftBill import DraftBillResource
+from .group import GroupResource
 
 def init_resources(api: Api):
     """
@@ -25,3 +28,6 @@ def init_resources(api: Api):
     api.add_resource(TotalLedgerResource, '/ledgers/total')
     api.add_resource(LedgerResource,'/ledgers', '/ledgers/<string:ledger_id>')
     api.add_resource(HomeBillResource, '/bills/all')
+    api.add_resource(ItemBillResource, '/bills/<string:bill_id>/items')
+    api.add_resource(DraftBillResource, '/bills/draft', '/bills/<string:bill_id>/draft')
+    api.add_resource(GroupResource, '/groups', '/groups/<string:group_id>', '/groups/<string:group_id>/<string:user_id>')

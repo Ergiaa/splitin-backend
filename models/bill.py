@@ -129,3 +129,19 @@ class Bill:
                 result.append(data)
 
         return result
+    
+    @staticmethod
+    def get_all_by_group(group_id):
+        """
+        Get all bills associated with a specific group.
+        """
+        bills_ref = db.collection("bills")
+        bills = bills_ref.where("group_id", "==", group_id).stream()
+        
+        result = []
+        for bill in bills:
+            data = bill.to_dict()
+            data["id"] = bill.id
+            result.append(data)
+
+        return result

@@ -8,19 +8,39 @@ class BillService:
     def create_bill(self):
         ref = Bill.create_ref()
 
-        participant = [ctx.user_id]
-
         data = {
             'bill_name': f'split_bill-{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}-{ref.id}',
             'created_by': ctx.user_id,
             'join_code': ref.id,
-            'participants': participant,
+            'participants': [],
             'is_finalized': False,
         }
 
         ref.set(data)
 
-        return ref.to_dict()
+        return ref.get().to_dict()
+    
+    def add_item(self, data, bill_id):
+        bill = Bill(bill_id)
+
+        if bill is None:
+            raise CustomError("bill not found", 404)
+        
+        existing_items = bill.get_items()
+        
+        if existing_items != []:
+            raise CustomError("items already set", 403)
+        
+        for i in data:
+            item = Items.create_ref(bill.id)
+
+            item.set({
+                "name": i.get('name'),
+                "unit_price": i.get('unit_price', 0),
+                "total_quantity": i.get('total_quantity', 1),
+            })
+
+        return bill.get_items()
     
     def create_completed_bill(self, args):
         ref = Bill.create_ref()
@@ -222,16 +242,35 @@ class BillService:
 
         return resp
     
+    def get_draft_bill(self, bill_id):
+        bill = Bill(bill_id)
+        data = bill.get()
+
+        if not data:
+            raise CustomError("bill not found", 404)
+
+        if data.get('is_finalized', True) is True:
+            raise CustomError("bill is finalized", 403)
+        
+        payments = bill.get_payments()
+        participants = bill.get_participants()
+        items = bill.get_items()
+        for i in items:
+            i['assignments'] = Items(bill_id=bill.id, id=i['item_id']).get_assignments()
+
+        resp = {
+            **data,
+            'payments': payments,
+            'participants_data': participants,
+            'items': items
+        }
+
+        return resp
+    
     def get_all_bill(self, user_id):
         bills = Bill.get_all(user_id)
         resp = []
         for data in bills:
-            if not data:
-                raise CustomError("bill not found", 404)
-
-            if data.get('is_finalized', True) is False:
-                raise CustomError("bill is a draft", 403)
-            
             payments = Bill(data['id']).get_payments()
             participants = Bill(data['id']).get_participants()
             
@@ -254,7 +293,7 @@ class BillService:
 
             resp.append({
                 'bill_name': data['bill_name'],
-                'total_price': data['total_price'],
+                'total_price': data.get('total_price', 0),
                 'total_debt': total_debt,
                 'total_credit': total_credit,
                 'created_at': data.get('created_at', '1999-01-01T00:00:00Z'),
