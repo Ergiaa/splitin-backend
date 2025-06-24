@@ -32,6 +32,27 @@ class Bill:
         if doc.exists:
             data = doc.to_dict()
             data["id"] = self.id
+
+            if data.get("group_id"):
+                group_ref = db.collection("groups").document(data["group_id"])
+                group_doc = group_ref.get()
+                if group_doc.exists:
+                    group_doc = group_doc.to_dict()
+                    data["participants"] = group_doc.get("members", [])
+
+            for participant in data.get("participants", []):
+                user_ref = db.collection("users").document(participant)
+                user_doc = user_ref.get()
+                if user_doc.exists:
+                    user_data = user_doc.to_dict()
+                    participant_index = data["participants"].index(participant)
+                    data["participants"][participant_index] = {
+                        "id": participant,
+                        "username": user_data.get("username", ""),
+                        "email": user_data.get("email", ""),
+                        "phone_number": user_data.get("phone_number", "")
+                    }
+
             return data
         return None
     
@@ -46,7 +67,6 @@ class Bill:
             {**doc.to_dict(), "payment_id": doc.id} for doc in payments_ref.stream()
         ]
         return payments
-
     
     def get_items(self):
         """
@@ -59,7 +79,6 @@ class Bill:
             {**doc.to_dict(), "item_id": doc.id} for doc in items_ref.stream()
         ]
         return items
-
     
     def get_participants(self):
         """

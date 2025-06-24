@@ -67,9 +67,8 @@ class GroupService:
 
         members = data.get('members', [])
 
-        if user_id:
-            if data.get('created_by') != user_id:
-                raise CustomError("not creator of group", 401)
+        if data.get('created_by') != ctx.user_id:
+            raise CustomError("not creator of group", 401)
 
         join_user_id = user_id or ctx.user_id
 

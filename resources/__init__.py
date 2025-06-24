@@ -12,6 +12,9 @@ from .homeBill import HomeBillResource
 from .itemBill import ItemBillResource
 from .draftBill import DraftBillResource
 from .group import GroupResource
+from .groupBill import GroupBillResource
+from .paymentBill import PaymentBillResource
+from .finalizeBill import FinalizeBillResource
 
 def init_resources(api: Api):
     """
@@ -31,3 +34,6 @@ def init_resources(api: Api):
     api.add_resource(ItemBillResource, '/bills/<string:bill_id>/items')
     api.add_resource(DraftBillResource, '/bills/draft', '/bills/<string:bill_id>/draft')
     api.add_resource(GroupResource, '/groups', '/groups/<string:group_id>', '/groups/<string:group_id>/<string:user_id>')
+    api.add_resource(GroupBillResource, '/bills/<string:bill_id>/groups/<string:group_id>')
+    api.add_resource(PaymentBillResource, '/bills/<string:bill_id>/payments')
+    api.add_resource(FinalizeBillResource, '/bills/<string:bill_id>/finalize')

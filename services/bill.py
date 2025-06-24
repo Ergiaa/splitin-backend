@@ -31,14 +31,22 @@ class BillService:
         if existing_items != []:
             raise CustomError("items already set", 403)
         
+        total_price = 0
+        
         for i in data:
             item = Items.create_ref(bill.id)
+
+            total_price += i.get('unit_price', 0) * i.get('total_quantity', 1)
 
             item.set({
                 "name": i.get('name'),
                 "unit_price": i.get('unit_price', 0),
                 "total_quantity": i.get('total_quantity', 1),
             })
+
+        bill.update({
+            'total_price': total_price,
+        })
 
         return bill.get_items()
     
@@ -154,7 +162,7 @@ class BillService:
         for item in response['items']:
             item['assignments'] = Items(bill_id=ref.id, id=item['id']).get_assignments()
         response['payments'] = Bill(ref.id).get_payments()
-        response['participants_data'] = Bill(ref.id).get_participants()
+        response['participants'] = Bill(ref.id).get_participants()
         response['ledgers'] = self.create_ledgers(bill_id=ref.id)
 
         return response
@@ -236,7 +244,7 @@ class BillService:
         resp = {
             **data,
             'payments': payments,
-            'participants_data': participants,
+            'ledgers': participants,
             'items': items
         }
 
@@ -261,7 +269,7 @@ class BillService:
         resp = {
             **data,
             'payments': payments,
-            'participants_data': participants,
+            'ledgers': participants,
             'items': items
         }
 
@@ -311,6 +319,11 @@ class BillService:
         
         if data.get('is_finalized', False):
             raise CustomError("bill is finalized", 403)
+        
+        group_id = data.get('group_id', None)
+
+        if group_id is not None:
+            raise CustomError("bill is part of a group, cannot join individually", 403)
 
         participants = data.get('participants', [])
 
@@ -326,3 +339,172 @@ class BillService:
         data['participants'] = participants
 
         return data
+    
+    def assign_group(self, bill_id, group_id):
+        ref = Bill(bill_id)
+        data = ref.get()
+
+        if not data:
+            raise CustomError("bill not found", 404)
+        
+        if data.get('is_finalized', False):
+            raise CustomError("bill is finalized", 403)
+        
+        group_ref = Groups(group_id)
+        group_data = group_ref.get()
+
+        if not group_data:
+            raise CustomError("group not found", 404)
+
+        ref.update({'group_id': group_id})
+
+        return ref.get()
+
+    def assign_items(self, bill_id, item_id, assignments):
+        bill = Bill(bill_id)
+        item = Items(bill_id=bill_id, id=item_id)
+
+        if not bill.get():
+            raise CustomError("bill not found", 404)
+        
+        if not item.get():
+            raise CustomError("item not found", 404)
+
+        for assignment in assignments:
+            user_id = assignment.get('user_id')
+            quantity = assignment.get('quantity', 1)
+
+            if not user_id:
+                raise CustomError("user_id is required for assignment", 400)
+
+            assignment_ref = Assignments.create_ref(
+                bill_id=bill.id,
+                item_id=item.id,
+                user_id=user_id
+            )
+
+            assignment_ref.set({
+                'user_id': user_id,
+                'quantity': quantity,
+            })
+
+        return item.get_assignments()
+    
+    def assign_payments(self, bill_id, payments):
+        bill = Bill(bill_id)
+
+        if not bill.get():
+            raise CustomError("bill not found", 404)
+        
+        for payment in payments:
+            amount = payment.get('amount')
+            paid_by = payment.get('paid_by', ctx.user_id)
+
+            if not amount:
+                raise CustomError("amount is required for payment", 400)
+
+            payment_ref = Payments.create_ref(bill_id=bill.id)
+            payment_ref.create({
+                'amount': amount,
+                'paid_by': paid_by,
+            })
+
+        return bill.get_payments()
+    
+    def finalize_bill(self, bill_id, args):
+        bill = Bill(bill_id)
+
+        if not bill.get():
+            raise CustomError("bill not found", 404)
+        
+        if bill.get().get('is_finalized', False):
+            raise CustomError("bill is already finalized", 403)
+        
+        if args.get('bill_name'):
+            bill.update({'bill_name': args['bill_name']})
+        
+
+        self.create_participant(bill_id=bill.id)
+
+        self.create_ledgers(bill_id=bill.id)
+
+        data = bill.get()
+
+        payments = bill.get_payments()
+        participants = bill.get_participants()
+        items = bill.get_items()
+        for i in items:
+            i['assignments'] = Items(bill_id=bill.id, id=i['item_id']).get_assignments()
+
+        resp = {
+            **data,
+            'payments': payments,
+            'ledgers': participants,
+            'items': items
+        }
+        
+        bill.update({'is_finalized': True})
+
+        return resp
+
+    def create_participant(self, bill_id):
+        bill = Bill(bill_id)
+
+        if not bill.get():
+            raise CustomError("bill not found", 404)
+        
+        if bill.get().get('is_finalized', False):
+            raise CustomError("bill is finalized", 403)
+        
+        items = bill.get_items()
+
+        if not items:
+            raise CustomError("no items in the bill", 400)
+        
+        payments = bill.get_payments()
+
+        if not payments:
+            raise CustomError("no payments in the bill", 400)
+        
+        total_per_participant = {}
+        
+        for item in items:
+            item['assignments'] = Items(bill_id=bill.id, id=item['item_id']).get_assignments()
+
+            if not item.get('assignments'):
+                raise CustomError("item assignments are required", 400)
+            
+            for assignment in item['assignments']:
+                user_id = assignment.get('user_id')
+                quantity = assignment.get('quantity', 1)
+
+                if not user_id:
+                    raise CustomError("user_id is required for assignment", 400)
+
+                total_per_participant[user_id] = total_per_participant.get(user_id, 0) + (item['unit_price'] * quantity)
+
+        for payment in payments:
+            paid_by = payment.get('paid_by', ctx.user_id)
+            amount = payment.get('amount', 0)
+
+            if not paid_by:
+                raise CustomError("paid_by is required for payment", 400)
+
+            total_per_participant[paid_by] = total_per_participant.get(paid_by, 0) - amount
+
+            if total_per_participant[paid_by] <= 0:
+                total_per_participant.pop(paid_by, None)
+
+        participants = []
+        for user_id, amount in total_per_participant.items():
+            participant_ref = Participants.create_ref(bill_id=bill.id, participant_id=user_id)
+            participant_ref.create({
+                'amount_owed': amount,
+                'is_settled': False,
+            })
+            participant_dict = participant_ref.get().to_dict()
+            participant_dict['participant_id'] = participant_ref.id
+
+            participants.append(participant_dict)
+
+        return participants
