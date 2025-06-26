@@ -278,21 +278,38 @@ class BillService:
     def get_all_bill(self, user_id):
         bills = Bill.get_all(user_id)
         resp = []
+
+        # Collect all unique participant user IDs
+        user_ids = set()
+        for data in bills:
+            for person_id in data['participants']:
+                user_ids.add(person_id)
+
+        # Fetch all users in bulk
+        users_dict = User.get_by_ids(list(user_ids))  # { user_id: user_data }
+
+        def format_user(user_id):
+            user = users_dict.get(user_id)
+            return {
+                "id": user_id,
+                "username": user.get("username", "") if user else "",
+                "email": user.get("email", "") if user else "",
+                "phone_number": user.get("phone_number", "") if user else ""
+            }
+
         for data in bills:
             payments = Bill(data['id']).get_payments()
             participants = Bill(data['id']).get_participants()
-            
-            users = []
-            for person in data['participants']:
-                user = User(person).get()
-                users.append(user)
+
+            # Format participant users
+            users = [format_user(pid) for pid in data['participants']]
 
             total_credit = 0
             for pay in payments:
                 if pay['paid_by'] == user_id:
                     total_credit = pay['amount']
                     break
-            
+
             total_debt = 0
             for p in participants:
                 if p['participant_id'] == user_id:

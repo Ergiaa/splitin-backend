@@ -86,3 +86,20 @@ class User:
             }
 
         return {"exists": False}
+
+    @staticmethod
+    def get_by_ids(user_ids):
+        """
+        Fetch multiple users from Firestore by document ID.
+        Returns a dictionary mapping user_id -> user_data.
+        """
+        result = {}
+        users_ref = db.collection("users")
+
+        for user_id in user_ids:
+            doc_ref = users_ref.document(user_id)
+            doc = doc_ref.get()
+            if doc.exists:
+                result[user_id] = doc.to_dict()
+
+        return result
