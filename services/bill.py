@@ -14,6 +14,7 @@ class BillService:
             'join_code': ref.id,
             'participants': [],
             'is_finalized': False,
+            'created_at': datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
         }
 
         ref.set(data)
@@ -77,6 +78,7 @@ class BillService:
             'join_code': ref.id,
             'split_type': split_type,
             'is_finalized': True,
+            'created_at': datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
         }
 
         if not args.get('group_id'):
